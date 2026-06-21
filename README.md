@@ -1,126 +1,181 @@
-# War Room Pro v4
+# War Room Pro v4 Hybrid
 
 Sistem automasi lead management untuk **REN (Real Estate Negotiator)** — dibangunkan oleh **Zubair Ariff (ZK Revenue Ops)**.
+
+> **v4 Hybrid — Scale tanpa human burden.**
 
 ---
 
 ## Apa Sistem Ni Buat?
 
-War Room Pro v4 automasi proses follow-up leads untuk **2+ clients**:
+War Room Pro v4 Hybrid kombinasi **Google Apps Script** (front office) + **Python GitHub Actions** (back office) untuk automasi penuh follow-up leads:
 
-| Feature | Description |
-|---------|-------------|
-| 🔢 **Lead Scoring** | Auto-kira priority score setiap lead (0-100) |
-| 👻 **Ghost Revival** | Auto-detect leads dorman > 7 hari, assign stage (Day 7 → Day 180) |
-| ⚡ **Batch Processing** | Proses 50 leads per run (3x sehari = 150 leads/hari) |
-| 📝 **Smart Scripting** | Pilih pre-written script based on funnel stage — dari VA Outreach Toolkit |
-| 🤖 **AI Analysis** | Groq AI untuk analyze top priority leads sahaja (save API quota) |
-| 📱 **Telegram Reports** | Daily summary terus ke phone dengan stats |
-| 📊 **Google Sheets Sync** | Auto-update status, notes, ghost stage, priority score |
+| Feature | Apps Script (Front) | Python Backend (Back) |
+|---------|---------------------|----------------------|
+| 📱 **WhatsApp Send** | ✅ Click-to-send | — |
+| 📋 **Script Preview** | ✅ Sidebar real-time | — |
+| 🧮 **DSR Calculator** | ✅ Built-in | — |
+| 📊 **Visual Dashboard** | ✅ KPI cards, funnel | — |
+| 🔢 **Lead Scoring** | Basic (real-time) | **Advanced (0-100)** |
+| 👻 **Ghost Revival** | Manual detect | **7 stages auto (Day 7→180)** |
+| ⚡ **Batch Processing** | **Send Top 5/10/20** | **50 leads/run** |
+| 🤖 **AI Analysis** | — | **Groq (top priority only)** |
+| 📱 **Telegram Reports** | — | **Daily summary semua client** |
+| 📊 **Multi-Client** | **Per-client sheet** | **Auto-read all sheets** |
 
 ---
 
 ## Architecture
 
 ```
-GitHub Actions (3x sehari)
-    └── war_room_v4.py (main engine)
-        ├── config.py (settings & script templates)
-        ├── Google Sheets (The Closing Desk™)
-        │   ├── Client_A (250 leads)
-        │   └── Client_B (250 leads)
-        └── Telegram (daily reports)
+Google Sheets (Per Client)
+    ├── Apps Script → WhatsApp, Sidebar, DSR, Dashboard
+    └── Python Backend (GitHub Actions, 5 AM daily)
+        ├── Read all client sheets
+        ├── Calculate priority (advanced)
+        ├── Detect ghost stages
+        ├── Generate next action scripts
+        ├── Write back to sheets
+        └── Send Telegram summary
 ```
 
 ---
 
-## Setup
+## Quick Start
 
-### 1. Configure GitHub Secrets
+### 1. Setup GitHub Secrets
 
-Pergi ke **GitHub → Settings → Secrets and variables → Actions → New repository secret**
+Pergi ke **GitHub → Settings → Secrets and variables → Actions**
 
 | Secret | Apa Ni? | Cara Dapat |
 |--------|---------|------------|
-| `GROQ_API_KEY` | API key untuk AI analysis | [Groq Console](https://console.groq.com) — free tier |
-| `TELEGRAM_BOT_TOKEN` | Bot token untuk report | @BotFather di Telegram → `/newbot` |
-| `TELEGRAM_CHAT_ID` | Chat ID kau | @userinfobot → start, copy ID |
-| `GOOGLE_CREDENTIALS_JSON` | Service account JSON | Google Cloud Console → Service Account → Key → JSON (copy paste full JSON) |
-| `TAVILY_API_KEY` | (Optional) Research API | [Tavily](https://tavily.com) — free tier |
-| `DEEPSEEK_API_KEY` | (Legacy) Not used in v4 | Boleh delete kalau nak bersihkan |
+| `GROQ_API_KEY` | AI analysis | [Groq Console](https://console.groq.com) — free tier |
+| `TELEGRAM_BOT_TOKEN` | Bot report | @BotFather → `/newbot` |
+| `TELEGRAM_CHAT_ID` | Chat ID | @userinfobot → start |
+| `GOOGLE_CREDENTIALS_JSON` | Google API | Google Cloud → Service Account → JSON key |
 
 ### 2. Setup Google Sheets
 
-1. **Create spreadsheet** bernama `The Closing Desk™`
-2. **Create 2 tabs:** `Client_A` dan `Client_B`
-3. **Add headers** (Row 1) — lihat `database_schema.md`
-4. **Paste 250 leads** ke setiap tab
+Setiap client = satu Google Spreadsheet (File → Make a copy dari template).
 
-> **Nota:** Tukar nama tab? Edit `config.py` → `sheet_name` untuk setiap client.
+**Tab structure:**
+| Tab | Purpose |
+|-----|---------|
+| Command Center | Dashboard KPI |
+| War Room | Leads database (row 3 = headers, row 4+ = data) |
+| Engine | Activity log |
+| Ghost Revival | Dormant leads |
+| System Brain | Script templates (sync dari Outreach Toolkit) |
 
-### 3. Run Schedule
+### 3. Update Apps Script
+
+1. Google Sheet → `Extensions` → `Apps Script`
+2. Copy `apps_script_additions.gs` dari repo
+3. Paste di bawah kod sedia ada
+4. Replace `onOpen()` dengan versi baru (tambah menu batch)
+5. Save & Refresh
+
+**Menu baru:**
+- 🚀 Closing Desk → 📱⚡ Send WA — Top 5 Batch
+- 🚀 Closing Desk → 🔥⚡ Process All Hot Leads
+- 🚀 Closing Desk → 👻⚡ Queue All Ghosts
+
+### 4. Configure Clients
+
+Edit `config_hybrid.py`:
+
+```python
+CLIENTS = {
+    "client_a": {
+        "spreadsheet_id": "1jM-TzPwlXwkEbcMLsoEksEiAb04qAzpTxAhIV1YQzSE",
+        "sheet_name": "War Room",
+        "batch_size": 25,
+    },
+    # "client_b": {
+    #     "spreadsheet_id": "PASTE_ID_HERE",
+    #     "sheet_name": "War Room",
+    #     "batch_size": 25,
+    # },
+}
+```
+
+### 5. Run Schedule
 
 | Time (MYT) | Action |
 |------------|--------|
-| **9:00 AM** | Morning scan — process top priority leads |
-| **1:00 PM** | Mid-day scan — follow-up leads |
-| **5:00 PM** | Evening scan — summary & ghost detection |
+| **5:00 AM** | Python backend auto-run (GitHub Actions) |
+| **5:05 AM** | Telegram report arrives |
+| **9:00 AM** | Kau baca report, buka sheet, click batch send |
+| **Selesai** | |
 
-**Manual run:** GitHub → Actions → War Room Pro v4 → Run workflow
+**Manual run:** GitHub → Actions → War Room Backend → Run workflow
 
-### 4. Customization
+---
 
-Edit `config.py` untuk:
-- **Tambah client baru** — duplicate entry dalam `CLIENTS`
-- **Tukar script templates** — edit `FIRST_TOUCH_SCRIPTS`, `GHOST_REVIVAL_SCRIPTS`, `HOT_LEAD_SCRIPTS`
-- **Adjust batch size** — `BATCH_SIZE_TOTAL` (default 50)
-- **Adjust AI limit** — `AI_ANALYSIS_LIMIT` (default 10 per run)
-- **Tukar thresholds** — `STATUS_WEIGHTS`, `SOURCE_BONUS`
+## Scaling: Tambah Client Baru
+
+**One-time setup (5 min):**
+1. File → Make a copy dari The Closing Desk template
+2. Paste leads dalam War Room tab
+3. Dapat spreadsheet ID dari URL
+4. Tambah dalam `config_hybrid.py`
+5. Push ke GitHub
+
+**Daily effort:** **Tetap 8 minit** — sama untuk 1 client atau 10 clients.
 
 ---
 
 ## Free Tier Limits (100% Percuma)
 
-| Service | Free Quota | Coverage Kita |
-|---------|-----------|---------------|
-| **GitHub Actions** | 2,000 min/month | ~180 min/month (3x/day) ✅ |
-| **Groq** | Rate limited | ~30 AI calls/day (top priority only) ✅ |
-| **Google Sheets API** | 100 req/100s | Batch update, 1 call per lead ✅ |
-| **Telegram** | Unlimited | Unlimited ✅ |
+| Service | Free Quota | Kita Guna | Status |
+|---------|-----------|-----------|--------|
+| GitHub Actions | 2,000 min/month | ~30 min/month | ✅ Safe |
+| Groq API | Rate limited | ~10 calls/day | ✅ Safe |
+| Google Sheets API | 100 req/100s | ~50 calls/day | ✅ Safe |
+| Telegram | Unlimited | Unlimited | ✅ Safe |
+| Apps Script | 20,000 cells/day | ~500 cells/day | ✅ Safe |
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `config_hybrid.py` | Client config, thresholds, script templates |
+| `war_room_v4_backend.py` | Main backend engine |
+| `requirements_backend.txt` | Python dependencies |
+| `apps_script_additions.gs` | Batch features untuk Apps Script |
+| `HYBRID_SETUP.md` | Full setup guide |
 
 ---
 
 ## Changelog
 
-### v4 (Current)
-- ✅ Multi-client support (2+ clients)
-- ✅ Lead scoring engine (0-100)
-- ✅ Ghost revival with 7 stages (Day 7 → Day 180)
-- ✅ Batch processing (50 leads/run)
-- ✅ Smart script selection (pre-written templates)
-- ✅ AI analysis limit (save API quota)
-- ✅ Batch Google Sheets update (1 API call per lead)
-- ✅ Improved Telegram reports (stats + analysis)
-- ✅ Flexible column mapping (auto-detect headers)
-- ✅ Auto-status update (Ghost/Dormant detection)
+### v4 Hybrid (Current)
+- ✅ Hybrid: Apps Script + Python backend
+- ✅ Multi-client (2+ clients, unlimited)
+- ✅ Advanced priority scoring (status + price + days + source + engagement)
+- ✅ Ghost detection 7 stages (Day 7 → 180)
+- ✅ Batch WhatsApp (Top 5/10/20)
+- ✅ Hot leads batch processing
+- ✅ Auto-queue all ghosts
+- ✅ Daily Telegram report (all clients)
+- ✅ Batch Google Sheets update
+- ✅ AI analysis (top priority only, save quota)
+- ✅ Zero human burden daily workflow
+
+### v4 (Python only)
+- Multi-client support
+- Lead scoring engine
+- Ghost revival
+- Batch processing
+- Smart scripting
 
 ### v3 (Original)
 - Dual AI brain (Groq + DeepSeek via Swarm)
 - Single client only
 - 3 leads per run
-- Basic Telegram notification
-- No lead scoring
-- No ghost revival
-
----
-
-## Support
-
-Kalau ada issue, check:
-1. **GitHub Actions logs** — GitHub → Actions → latest run → check error
-2. **Telegram** — confirm bot token & chat ID betul
-3. **Google Sheets** — confirm spreadsheet name & tab names match `config.py`
-4. **Secrets** — confirm semua secrets dah set dekat repo
+- Basic Telegram
 
 ---
 
