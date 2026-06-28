@@ -2,7 +2,8 @@ name: War Room Backend — Daily Analytics (v4 Hybrid)
 
 on:
   schedule:
-    - cron: '0 21 * * *'
+    # Runs at 7:30 AM Malaysia Time (UTC+8) = 23:30 UTC previous day
+    - cron: '30 23 * * *'
   workflow_dispatch:
 
 jobs:

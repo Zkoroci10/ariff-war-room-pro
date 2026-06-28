@@ -1,6 +1,6 @@
 """
 War Room Pro v4 Hybrid — Backend Engine
-Run sekali sehari (5 AM MYT) via GitHub Actions
+Run sekali sehari (7:30 AM MYT) via GitHub Actions
 """
 import os
 import json
@@ -14,7 +14,8 @@ from openai import OpenAI
 from config_hybrid import (
     CLIENTS, BATCH_SIZE_TOTAL, AI_ANALYSIS_LIMIT, GHOST_STAGES,
     STATUS_WEIGHTS, SOURCE_BONUS,
-    FIRST_TOUCH_SCRIPTS, GHOST_REVIVAL_SCRIPTS, HOT_LEAD_SCRIPTS
+    FIRST_TOUCH_SCRIPTS, GHOST_REVIVAL_SCRIPTS, HOT_LEAD_SCRIPTS,
+    ENABLE_BATCH_UPDATES, CACHE_PRIORITY_CALCULATION, PARALLEL_PROCESSING
 )
 
 # =============================================================================
@@ -77,6 +78,10 @@ def read_client_sheet(client_key):
 # =============================================================================
 # LEAD ENGINE
 # =============================================================================
+
+# Cache for priority calculations
+_priority_cache = {}
+
 def parse_date(date_str):
     if not date_str:
         return None
@@ -95,6 +100,12 @@ def days_since(date_str):
     return (datetime.now() - dt).days
 
 def calculate_priority(lead):
+    # Use cache if enabled
+    if CACHE_PRIORITY_CALCULATION:
+        lead_key = hash(frozenset(lead.items()))
+        if lead_key in _priority_cache:
+            return _priority_cache[lead_key]
+    
     score = 0
     status = str(lead.get("STATUS", "")).strip().lower()
     source = str(lead.get("SOURCE", "")).strip().lower()
@@ -139,7 +150,13 @@ def calculate_priority(lead):
     except ValueError:
         pass
 
-    return min(int(score), 100)
+    result = min(int(score), 100)
+    
+    # Cache the result
+    if CACHE_PRIORITY_CALCULATION:
+        _priority_cache[lead_key] = result
+    
+    return result
 
 def identify_ghost_stage(lead):
     days = days_since(lead.get("LAST CONTACT", ""))
@@ -203,16 +220,19 @@ Provide 1) next action, 2) tone, 3) why priority. Under 100 words. Malay/Manglis
 # =============================================================================
 # SHEET UPDATE
 # =============================================================================
-def update_sheet(ws, lead, row_idx, headers):
+def update_sheet(ws, lead, row_idx, headers, batch_mode=False):
+    """Update sheet with optional batch mode for better performance"""
     try:
         # SKIP update kalau lead ni kosong
         name = lead.get("PROSPECT NAME", lead.get("NAME", ""))
         if not name or not str(name).strip():
-            return
+            return [] if batch_mode else None
+        
         col_map = {h: i+1 for i, h in enumerate(headers) if h}
         sheet_row = row_idx + 4
         today = datetime.now().strftime("%Y-%m-%d")
         cells = []
+        
         if "NEXT ACTION" in col_map:
             cells.append(gspread.Cell(sheet_row, col_map["NEXT ACTION"], lead.get("_next_action", "")))
         if "GHOST STAGE" in col_map:
@@ -230,10 +250,28 @@ def update_sheet(ws, lead, row_idx, headers):
             cells.append(gspread.Cell(sheet_row, col_map["NOTES"], combined[:500]))
         if "STATUS" in col_map and lead.get("_ghost_stage") and not str(lead.get("STATUS", "")).strip().lower() == "ghost":
             cells.append(gspread.Cell(sheet_row, col_map["STATUS"], "Ghost"))
-        if cells:
+        
+        if batch_mode:
+            return cells
+        elif cells:
             ws.update_cells(cells, value_input_option='USER_ENTERED')
     except Exception as e:
         print(f"Sheet update error for row {row_idx}: {e}")
+        return [] if batch_mode else None
+
+def batch_update_sheet(ws, all_cells):
+    """Batch update all cells at once for better performance"""
+    if not all_cells or not ENABLE_BATCH_UPDATES:
+        return
+    
+    try:
+        # Flatten all cells list
+        flat_cells = [cell for cells_list in all_cells for cell in cells_list]
+        if flat_cells:
+            ws.update_cells(flat_cells, value_input_option='USER_ENTERED')
+            print(f"  ✓ Batch updated {len(flat_cells)} cells efficiently")
+    except Exception as e:
+        print(f"Batch update error: {e}")
 
 # =============================================================================
 # MAIN ENGINE
@@ -288,6 +326,9 @@ def process_client(client_key):
         f"*{client_key}* — {len(records)} leads | 🔥 {hot_count} | 📅 {appt_count} | 💰 {closing_count} | 🟡 {warm_count} | 🔵 {cold_count} | 🆕 {new_count} | 👻 {ghost_count} | {len(batch)} updated\n"
     ]
 
+    # Collect all cells for batch update
+    all_cells = []
+    
     for lead in batch:
         name = lead.get("PROSPECT NAME", lead.get("NAME", "Unknown"))
         print(f"  → {name} (P:{lead['_priority']}, G:{lead['_ghost_stage'] or 'Active'})")
@@ -301,10 +342,22 @@ def process_client(client_key):
         else:
             analysis = f"Script: {script[:100]}..."
         lead["_analysis"] = analysis
-        update_sheet(ws, lead, lead["_idx"], headers)
+        
+        # Collect cells for batch update instead of updating one-by-one
+        if ENABLE_BATCH_UPDATES:
+            cells = update_sheet(ws, lead, lead["_idx"], headers, batch_mode=True)
+            if cells:
+                all_cells.append(cells)
+        else:
+            update_sheet(ws, lead, lead["_idx"], headers, batch_mode=False)
+        
         ghost_info = f" | Ghost: {lead['_ghost_stage']}" if lead['_ghost_stage'] else ""
         report_lines.append(f"• *{name}* — P:{lead['_priority']}/100{ghost_info}\n  {analysis[:120]}...")
         time.sleep(0.5)
+    
+    # Perform batch update at the end
+    if ENABLE_BATCH_UPDATES and all_cells:
+        batch_update_sheet(ws, all_cells)
 
     return enriched, len(batch), "\n".join(report_lines)
 
