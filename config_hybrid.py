@@ -30,8 +30,13 @@ CLIENTS = {
 }
 
 # === BACKEND SETTINGS ===
-BATCH_SIZE_TOTAL = 50   # Max leads processed across ALL clients per run
-AI_ANALYSIS_LIMIT = 10  # Max AI calls per run (save API quota)
+BATCH_SIZE_TOTAL = 100  # Max leads processed across ALL clients per run (optimized from 50)
+AI_ANALYSIS_LIMIT = 20  # Max AI calls per run (optimized from 10 for better insights)
+
+# === PERFORMANCE OPTIMIZATIONS ===
+ENABLE_BATCH_UPDATES = True  # Batch sheet updates instead of one-by-one
+CACHE_PRIORITY_CALCULATION = True  # Cache priority scores to avoid recalculation
+PARALLEL_PROCESSING = True  # Enable parallel client processing
 
 # === GHOST STAGES ===
 GHOST_STAGES = [7, 14, 30, 60, 90, 120, 180]

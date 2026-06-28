@@ -16,7 +16,7 @@
 │  └── Engine Activity Log                                         │
 │                                                                  │
 │  BACK OFFICE (Python + GitHub Actions)                           │
-│  ├── Daily Analytics (5 AM MYT)                                │
+│  ├── Daily Analytics (7:30 AM MYT)                              │
 │  ├── Advanced Priority Scoring (0-100)                           │
 │  ├── Ghost Stage Detection (Day 7 → 180)                         │
 │  ├── Next Action Script Generation                               │
@@ -158,8 +158,8 @@ git push origin main
 
 | Time | Event | Effort |
 |------|-------|--------|
-| **5:00 AM** | Python backend auto-run | 0 min |
-| **5:05 AM** | Telegram report arrives | 0 min |
+| **7:30 AM** | Python backend auto-run | 0 min |
+| **7:35 AM** | Telegram report arrives | 0 min |
 | **9:00 AM** | Kau baca Telegram summary | 1 min |
 | **9:05 AM** | Buka client sheet → click "📱⚡ Send WA — Top 5 Batch" | 2 min |
 | **9:10 AM** | Click setiap link dalam dialog → hantar WhatsApp | 5 min |
